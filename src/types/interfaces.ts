@@ -57,7 +57,7 @@ export interface InteractableObject {
 // Dialogue system interfaces
 export interface DialogueNode {
   id: string;
-  speaker: string;
+  speaker?: string;
   text: string;
   choices?: DialogueChoice[];
   next?: string;
@@ -66,7 +66,8 @@ export interface DialogueNode {
 
 export interface DialogueChoice {
   text: string;
-  nextNodeId: string;
+  nextNodeId?: string;
+  nextId?: string; // Allow both for backwards compatibility
   condition?: string;
 }
 

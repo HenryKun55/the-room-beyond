@@ -1,6 +1,7 @@
 import { Game } from '@core/Game';
 import { StorySystem } from '@systems/StorySystem';
 import { InteractionSystem } from '@systems/InteractionSystem';
+import { DialogueManager } from '@systems/DialogueManager';
 import { ObjectFactory } from '@core/ObjectFactory';
 import * as THREE from 'three';
 
@@ -17,13 +18,14 @@ async function initGame(): Promise<void> {
     // Initialize systems
     const storySystem = new StorySystem();
     const interactionSystem = new InteractionSystem();
+    const dialogueManager = new DialogueManager();
     const objectFactory = new ObjectFactory();
     
     // Set interaction system reference in game
     game.setInteractionSystem(interactionSystem);
     
     // Create the main room scene
-    createMainRoomScene(game, storySystem, interactionSystem, objectFactory);
+    createMainRoomScene(game, storySystem, interactionSystem, dialogueManager, objectFactory);
     
     // Set up collision objects for camera controller
     setupCollisions(game, interactionSystem);
@@ -32,7 +34,7 @@ async function initGame(): Promise<void> {
     setupProximityFeedback(interactionSystem);
     
     // Connect E key to interaction system
-    setupInteractionControls(game, interactionSystem);
+    setupInteractionControls(game, interactionSystem, dialogueManager);
     
     // Start the game
     game.start();
@@ -41,7 +43,7 @@ async function initGame(): Promise<void> {
     updateDebugInfo(game, storySystem, interactionSystem);
 }
 
-function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem, objectFactory: ObjectFactory): void {
+function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem, dialogueManager: DialogueManager, objectFactory: ObjectFactory): void {
     const scene = game.getScene();
     
     // Add atmospheric lighting
@@ -94,8 +96,8 @@ function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSy
     scene.add(alarmClock.mesh);
     interactionSystem.registerObject(alarmClock);
     
-    // Connect objects to story system
-    setupStoryIntegration(storySystem, interactionSystem);
+    // Connect objects to story system and dialogue
+    setupStoryIntegration(storySystem, interactionSystem, dialogueManager);
 }
 
 function createRoomStructure(scene: THREE.Scene): void {
@@ -146,15 +148,18 @@ function setupCollisions(game: Game, interactionSystem: InteractionSystem): void
     console.log(`Collision detection enabled for ${registeredObjects.length} objects`);
 }
 
-function setupInteractionControls(game: Game, interactionSystem: InteractionSystem): void {
+function setupInteractionControls(game: Game, interactionSystem: InteractionSystem, dialogueManager: DialogueManager): void {
     const inputHandler = game.getInputHandler();
     
     // Handle E key press for interaction
     document.addEventListener('keydown', (event) => {
         if (event.key.toLowerCase() === 'e') {
-            const success = interactionSystem.triggerInteraction();
-            if (success) {
-                console.log('Interaction triggered with E key');
+            // Don't trigger object interaction if dialogue is already active
+            if (!dialogueManager.isActive()) {
+                const success = interactionSystem.triggerInteraction();
+                if (success) {
+                    console.log('Interaction triggered with E key');
+                }
             }
         }
     });
@@ -193,20 +198,30 @@ function setupProximityFeedback(interactionSystem: InteractionSystem): void {
     console.log('Focus-based interaction system initialized');
 }
 
-function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem): void {
-    // Listen for object interactions and update story flags
+function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem, dialogueManager: DialogueManager): void {
+    // Listen for object interactions and start dialogue
     interactionSystem.onInteraction((object) => {
         console.log(`Interacted with: ${object.name}`);
-        storySystem.setFlag(`${object.id}_interacted`, true);
-        storySystem.discoverObject(object.id);
         
-        // Check for story progression
-        if (object.id === 'laptop') {
-            storySystem.setFlag('laptop_accessed', true);
-        } else if (object.id === 'vr_headset') {
-            storySystem.setFlag('vr_examined', true);
-        } else if (object.id === 'phone') {
-            storySystem.setFlag('phone_examined', true);
+        // Start dialogue for this object
+        const dialogueStarted = dialogueManager.startObjectDialogue(object.id);
+        
+        if (dialogueStarted) {
+            // Update story flags
+            storySystem.setFlag(`${object.id}_interacted`, true);
+            storySystem.discoverObject(object.id);
+            
+            // Check for story progression
+            if (object.id === 'laptop') {
+                storySystem.setFlag('laptop_accessed', true);
+            } else if (object.id === 'vr_headset') {
+                storySystem.setFlag('vr_examined', true);
+            } else if (object.id === 'phone') {
+                storySystem.setFlag('phone_examined', true);
+            }
+        } else {
+            // Fallback to simple message if no dialogue exists
+            console.log(`No dialogue available for ${object.name}`);
         }
     });
     

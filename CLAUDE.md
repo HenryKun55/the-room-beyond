@@ -13,6 +13,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **NEVER deviate from the established patterns, architecture, or requirements defined in these documents.**
 
+## 🚨 ABSOLUTE RULE: TEST-DRIVEN DEVELOPMENT (TDD)
+
+**NEVER WRITE IMPLEMENTATION CODE WITHOUT TESTS FIRST. NO EXCEPTIONS.**
+
+**MANDATORY TDD WORKFLOW:**
+1. **RED**: Write failing test first - ALWAYS
+2. **GREEN**: Write minimal code to pass the test
+3. **REFACTOR**: Improve code while keeping tests green
+
+**If you catch yourself writing implementation code without tests, STOP IMMEDIATELY and write tests first.**
+
 ## 🔄 MANDATORY: Update Development Status
 
 **AFTER implementing any feature, bug fix, or change, you MUST:**

@@ -27,6 +27,10 @@ export class DialogueSystem {
   removeNode(id: string): void {
     this.nodes.delete(id);
   }
+  
+  clearNodes(): void {
+    this.nodes.clear();
+  }
 
   // Dialogue Flow Control
   startDialogue(nodeId: string): void {
@@ -61,12 +65,19 @@ export class DialogueSystem {
     }
 
     const choice = availableChoices[choiceIndex];
-    const nextNode = this.getNode(choice.nextNodeId);
+    const nextNodeId = choice.nextNodeId || choice.nextId;
+    
+    if (!nextNodeId) {
+      console.warn('Choice has no next node specified');
+      return;
+    }
+    
+    const nextNode = this.getNode(nextNodeId);
     
     if (nextNode) {
       const previousNode = currentNode;
-      this.currentNodeId = choice.nextNodeId;
-      this.addToHistory(choice.nextNodeId);
+      this.currentNodeId = nextNodeId;
+      this.addToHistory(nextNodeId);
       this.emit('nodeChange', nextNode, previousNode);
     }
   }
@@ -157,6 +168,13 @@ export class DialogueSystem {
       if (index > -1) {
         listeners.splice(index, 1);
       }
+    }
+  }
+
+  on(event: DialogueEventType, callback: DialogueEventCallback): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      listeners.push(callback);
     }
   }
 

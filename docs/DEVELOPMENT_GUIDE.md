@@ -3,16 +3,23 @@
 
 ## Philosophy
 
+**🚨 ABSOLUTE RULE: Test-Driven Development (TDD)**
+
+**NEVER WRITE IMPLEMENTATION CODE WITHOUT TESTS FIRST. NO EXCEPTIONS.**
+
 **Test-Driven Development (TDD)** means writing tests BEFORE implementation:
-1. **Red** - Write a failing test
-2. **Green** - Write minimal code to pass
+1. **Red** - Write a failing test FIRST - ALWAYS
+2. **Green** - Write minimal code to pass the test
 3. **Refactor** - Improve code while keeping tests green
+
+**If you catch yourself writing implementation code without tests, STOP IMMEDIATELY and write tests first.**
 
 This ensures:
 - ✓ Every feature is tested
 - ✓ Code is designed for testability
 - ✓ Regression bugs are caught early
 - ✓ Documentation through tests
+- ✓ No accidental implementation without validation
 
 ## Development Environment Setup
 

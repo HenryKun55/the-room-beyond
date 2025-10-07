@@ -1,7 +1,7 @@
 import { Game } from '@core/Game';
 import { StorySystem } from '@systems/StorySystem';
 import { InteractionSystem } from '@systems/InteractionSystem';
-import { DialogueManager } from '@systems/DialogueManager';
+import { SimpleDialogueContent } from '@/content/SimpleDialogueContent';
 import { ObjectFactory } from '@core/ObjectFactory';
 import * as THREE from 'three';
 
@@ -18,14 +18,13 @@ async function initGame(): Promise<void> {
     // Initialize systems
     const storySystem = new StorySystem();
     const interactionSystem = new InteractionSystem();
-    const dialogueManager = new DialogueManager();
     const objectFactory = new ObjectFactory();
     
     // Set interaction system reference in game
     game.setInteractionSystem(interactionSystem);
     
     // Create the main room scene
-    createMainRoomScene(game, storySystem, interactionSystem, dialogueManager, objectFactory);
+    createMainRoomScene(game, storySystem, interactionSystem, objectFactory);
     
     // Set up collision objects for camera controller
     setupCollisions(game, interactionSystem);
@@ -34,7 +33,7 @@ async function initGame(): Promise<void> {
     setupProximityFeedback(interactionSystem);
     
     // Connect E key to interaction system
-    setupInteractionControls(game, interactionSystem, dialogueManager);
+    setupInteractionControls(game, interactionSystem);
     
     // Start the game
     game.start();
@@ -43,7 +42,7 @@ async function initGame(): Promise<void> {
     updateDebugInfo(game, storySystem, interactionSystem);
 }
 
-function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem, dialogueManager: DialogueManager, objectFactory: ObjectFactory): void {
+function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem, objectFactory: ObjectFactory): void {
     const scene = game.getScene();
     
     // Add atmospheric lighting
@@ -96,8 +95,8 @@ function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSy
     scene.add(alarmClock.mesh);
     interactionSystem.registerObject(alarmClock);
     
-    // Connect objects to story system and dialogue
-    setupStoryIntegration(storySystem, interactionSystem, dialogueManager);
+    // Connect objects to story system and simple dialogue
+    setupStoryIntegration(storySystem, interactionSystem);
 }
 
 function createRoomStructure(scene: THREE.Scene): void {
@@ -148,18 +147,15 @@ function setupCollisions(game: Game, interactionSystem: InteractionSystem): void
     console.log(`Collision detection enabled for ${registeredObjects.length} objects`);
 }
 
-function setupInteractionControls(game: Game, interactionSystem: InteractionSystem, dialogueManager: DialogueManager): void {
+function setupInteractionControls(game: Game, interactionSystem: InteractionSystem): void {
     const inputHandler = game.getInputHandler();
     
     // Handle E key press for interaction
     document.addEventListener('keydown', (event) => {
         if (event.key.toLowerCase() === 'e') {
-            // Don't trigger object interaction if dialogue is already active
-            if (!dialogueManager.isActive()) {
-                const success = interactionSystem.triggerInteraction();
-                if (success) {
-                    console.log('Interaction triggered with E key');
-                }
+            const success = interactionSystem.triggerInteraction();
+            if (success) {
+                console.log('Interaction triggered with E key');
             }
         }
     });
@@ -198,15 +194,18 @@ function setupProximityFeedback(interactionSystem: InteractionSystem): void {
     console.log('Focus-based interaction system initialized');
 }
 
-function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem, dialogueManager: DialogueManager): void {
-    // Listen for object interactions and start dialogue
+function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem): void {
+    // Listen for object interactions and show simple descriptions
     interactionSystem.onInteraction((object) => {
         console.log(`Interacted with: ${object.name}`);
         
-        // Start dialogue for this object
-        const dialogueStarted = dialogueManager.startObjectDialogue(object.id);
+        // Get simple description from SimpleDialogueContent
+        const description = SimpleDialogueContent.getObjectDescription(object.id);
         
-        if (dialogueStarted) {
+        if (description) {
+            // Display the simple description
+            showSimpleDescription(object.name, description);
+            
             // Update story flags
             storySystem.setFlag(`${object.id}_interacted`, true);
             storySystem.discoverObject(object.id);
@@ -220,8 +219,8 @@ function setupStoryIntegration(storySystem: StorySystem, interactionSystem: Inte
                 storySystem.setFlag('phone_examined', true);
             }
         } else {
-            // Fallback to simple message if no dialogue exists
-            console.log(`No dialogue available for ${object.name}`);
+            // Fallback to generic message if no description exists
+            showSimpleDescription(object.name, `You examine the ${object.name.toLowerCase()}.`);
         }
     });
     
@@ -233,6 +232,61 @@ function setupStoryIntegration(storySystem: StorySystem, interactionSystem: Inte
     storySystem.on('objectDiscovered', (data) => {
         console.log(`Object discovered: ${data.objectId} (${data.totalDiscovered} total)`);
     });
+}
+
+function showSimpleDescription(objectName: string, description: string): void {
+    // Find or create dialogue container
+    let dialogueContainer = document.getElementById('dialogue-container');
+    if (!dialogueContainer) {
+        dialogueContainer = document.createElement('div');
+        dialogueContainer.id = 'dialogue-container';
+        dialogueContainer.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff88;
+            padding: 20px;
+            border: 2px solid #00ff88;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            z-index: 1000;
+            display: none;
+        `;
+        document.body.appendChild(dialogueContainer);
+    }
+    
+    // Set the description text
+    dialogueContainer.innerHTML = `
+        <div style="margin-bottom: 10px; color: #fff; font-weight: bold;">${objectName}</div>
+        <div>${description}</div>
+        <div style="margin-top: 15px; color: #888; font-size: 12px;">Press SPACE to close</div>
+    `;
+    
+    // Show the dialogue
+    dialogueContainer.style.display = 'block';
+    
+    // Add SPACE key handler to close dialogue
+    const handleSpace = (event: KeyboardEvent) => {
+        if (event.key === ' ' || event.code === 'Space') {
+            dialogueContainer!.style.display = 'none';
+            document.removeEventListener('keydown', handleSpace);
+        }
+    };
+    document.addEventListener('keydown', handleSpace);
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+        if (dialogueContainer && dialogueContainer.style.display !== 'none') {
+            dialogueContainer.style.display = 'none';
+            document.removeEventListener('keydown', handleSpace);
+        }
+    }, 10000);
 }
 
 function updateDebugInfo(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem): void {

@@ -52,7 +52,7 @@ describe('ObjectFactory', () => {
       
       expect(phone.id).toBe('test_phone');
       expect(phone.name).toBe('Phone');
-      expect(phone.description).toContain('smartphone');
+      expect(phone.description).toContain('phone');
       expect(phone.mesh.position.set).toHaveBeenCalledWith(0, 1, 0);
       expect(phone.mesh.userData.interactableId).toBe('test_phone');
       expect(phone.examined).toBe(false);
@@ -72,7 +72,7 @@ describe('ObjectFactory', () => {
       
       phone.onExamine();
       
-      expect(consoleSpy).toHaveBeenCalledWith('Examining phone: It\'s turned off and won\'t respond.');
+      expect(consoleSpy).toHaveBeenCalledWith('My phone sits silent on the desk, its black screen reflecting nothing. I haven\'t touched it in hours - the constant buzzing and notifications felt overwhelming today.');
       consoleSpy.mockRestore();
     });
   });
@@ -83,7 +83,7 @@ describe('ObjectFactory', () => {
       
       expect(laptop.id).toBe('test_laptop');
       expect(laptop.name).toBe('Laptop');
-      expect(laptop.description).toContain('laptop computer');
+      expect(laptop.description).toContain('laptop');
       expect(laptop.mesh.position.set).toHaveBeenCalledWith(1, 0, 1);
       expect(laptop.mesh.userData.interactableId).toBe('test_laptop');
     });
@@ -101,7 +101,7 @@ describe('ObjectFactory', () => {
       
       laptop.onExamine();
       
-      expect(consoleSpy).toHaveBeenCalledWith('Examining laptop: The screen is black. It appears to be in sleep mode.');
+      expect(consoleSpy).toHaveBeenCalledWith('My laptop waits patiently, closed and silver. Behind that screen are emails I haven\'t answered, deadlines I\'m avoiding, and a world that feels too demanding right now.');
       consoleSpy.mockRestore();
     });
   });
@@ -112,7 +112,7 @@ describe('ObjectFactory', () => {
       
       expect(vr.id).toBe('test_vr');
       expect(vr.name).toBe('VR Headset');
-      expect(vr.description).toContain('virtual reality headset');
+      expect(vr.description).toContain('VR headset');
       expect(vr.mesh.position.set).toHaveBeenCalledWith(-1, 0.5, 0);
       expect(vr.mesh.userData.interactableId).toBe('test_vr');
     });
@@ -130,7 +130,7 @@ describe('ObjectFactory', () => {
       
       vr.onExamine();
       
-      expect(consoleSpy).toHaveBeenCalledWith('Examining VR headset: Heavy and sophisticated. The lenses are clean but the device is off.');
+      expect(consoleSpy).toHaveBeenCalledWith('The VR headset offers escape to anywhere but here. Virtual worlds where I can be anyone, go anywhere - where anxiety doesn\'t follow me. But when I take it off, I\'m still in this room.');
       consoleSpy.mockRestore();
     });
   });
@@ -141,7 +141,7 @@ describe('ObjectFactory', () => {
       
       expect(clock.id).toBe('test_clock');
       expect(clock.name).toBe('Alarm Clock');
-      expect(clock.description).toContain('digital alarm clock');
+      expect(clock.description).toContain('alarm clock');
       expect(clock.mesh.position.set).toHaveBeenCalledWith(2, 1, -1);
       expect(clock.mesh.userData.interactableId).toBe('test_clock');
     });
@@ -159,7 +159,7 @@ describe('ObjectFactory', () => {
       
       clock.onExamine();
       
-      expect(consoleSpy).toHaveBeenCalledWith('Examining alarm clock: Shows 3:47 AM. The red numbers glow ominously in the dark.');
+      expect(consoleSpy).toHaveBeenCalledWith('The alarm clock\'s red digits stare back at me: 3:47. AM or PM? Time has lost meaning when every day blends into the next. I should set an alarm, but for what?');
       consoleSpy.mockRestore();
     });
   });
@@ -170,7 +170,7 @@ describe('ObjectFactory', () => {
       
       expect(desk.id).toBe('test_desk');
       expect(desk.name).toBe('Desk');
-      expect(desk.description).toContain('wooden desk');
+      expect(desk.description).toContain('desk');
       expect(desk.mesh.position.set).toHaveBeenCalledWith(0, 0, 0);
       expect(desk.mesh.userData.interactableId).toBe('test_desk');
     });
@@ -180,7 +180,7 @@ describe('ObjectFactory', () => {
       
       expect(bed.id).toBe('test_bed');
       expect(bed.name).toBe('Bed');
-      expect(bed.description).toContain('unmade bed');
+      expect(bed.description).toContain('bed');
       expect(bed.mesh.position.set).toHaveBeenCalledWith(0, 0, 0);
       expect(bed.mesh.userData.interactableId).toBe('test_bed');
     });
@@ -190,7 +190,7 @@ describe('ObjectFactory', () => {
       
       expect(chair.id).toBe('test_chair');
       expect(chair.name).toBe('Chair');
-      expect(chair.description).toContain('office chair');
+      expect(chair.description).toContain('chair');
       expect(chair.mesh.position.set).toHaveBeenCalledWith(1, 0, 1);
       expect(chair.mesh.userData.interactableId).toBe('test_chair');
     });

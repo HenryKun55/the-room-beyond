@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { InteractableObject } from '../types/interfaces';
+import { SimpleDialogueContent } from '../content/SimpleDialogueContent';
 
 export class ObjectFactory {
   
@@ -25,14 +26,21 @@ export class ObjectFactory {
     phoneGroup.userData.interactableId = id;
     phoneGroup.castShadow = true;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('phone');
+    
     return {
       id,
       mesh: phoneGroup,
       name: 'Phone',
-      description: 'A sleek smartphone. The screen is black and unresponsive.',
+      description: dialogueDescription || 'A sleek smartphone. The screen is black and unresponsive.',
       examined: false,
       onExamine: () => {
-        console.log('Examining phone: It\'s turned off and won\'t respond.');
+        const description = SimpleDialogueContent.getObjectDescription('phone');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining phone: It\'s turned off and won\'t respond.');
+        }
       },
       highlightOnHover: true
     };
@@ -60,14 +68,21 @@ export class ObjectFactory {
     laptopGroup.position.set(x, y, z);
     laptopGroup.userData.interactableId = id;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('laptop');
+    
     return {
       id,
       mesh: laptopGroup,
       name: 'Laptop',
-      description: 'A modern laptop computer with a black screen.',
+      description: dialogueDescription || 'A modern laptop computer with a black screen.',
       examined: false,
       onExamine: () => {
-        console.log('Examining laptop: The screen is black. It appears to be in sleep mode.');
+        const description = SimpleDialogueContent.getObjectDescription('laptop');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining laptop: The screen is black. It appears to be in sleep mode.');
+        }
       },
       highlightOnHover: true
     };
@@ -94,14 +109,21 @@ export class ObjectFactory {
     vrGroup.position.set(x, y, z);
     vrGroup.userData.interactableId = id;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('vr_headset');
+    
     return {
       id,
       mesh: vrGroup,
       name: 'VR Headset',
-      description: 'A high-end virtual reality headset. It looks expensive and well-used.',
+      description: dialogueDescription || 'A high-end virtual reality headset. It looks expensive and well-used.',
       examined: false,
       onExamine: () => {
-        console.log('Examining VR headset: Heavy and sophisticated. The lenses are clean but the device is off.');
+        const description = SimpleDialogueContent.getObjectDescription('vr_headset');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining VR headset: Heavy and sophisticated. The lenses are clean but the device is off.');
+        }
       },
       highlightOnHover: true
     };
@@ -131,14 +153,21 @@ export class ObjectFactory {
     clockGroup.position.set(x, y, z);
     clockGroup.userData.interactableId = id;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('alarm_clock');
+    
     return {
       id,
       mesh: clockGroup,
       name: 'Alarm Clock',
-      description: 'A digital alarm clock with glowing red numbers.',
+      description: dialogueDescription || 'A digital alarm clock with glowing red numbers.',
       examined: false,
       onExamine: () => {
-        console.log('Examining alarm clock: Shows 3:47 AM. The red numbers glow ominously in the dark.');
+        const description = SimpleDialogueContent.getObjectDescription('alarm_clock');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining alarm clock: Shows 3:47 AM. The red numbers glow ominously in the dark.');
+        }
       },
       highlightOnHover: true
     };
@@ -178,14 +207,21 @@ export class ObjectFactory {
     deskGroup.position.set(x, y, z);
     deskGroup.userData.interactableId = id;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('desk');
+    
     return {
       id,
       mesh: deskGroup,
       name: 'Desk',
-      description: 'A sturdy wooden desk. Papers are scattered across its surface.',
+      description: dialogueDescription || 'A sturdy wooden desk. Papers are scattered across its surface.',
       examined: false,
       onExamine: () => {
-        console.log('Examining desk: Old work papers and coffee stains. Nothing important here.');
+        const description = SimpleDialogueContent.getObjectDescription('desk');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining desk: Old work papers and coffee stains. Nothing important here.');
+        }
       },
       highlightOnHover: true
     };
@@ -222,14 +258,21 @@ export class ObjectFactory {
     bedGroup.position.set(x, y, z);
     bedGroup.userData.interactableId = id;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('bed');
+    
     return {
       id,
       mesh: bedGroup,
       name: 'Bed',
-      description: 'An unmade bed with wrinkled sheets and a single pillow.',
+      description: dialogueDescription || 'An unmade bed with wrinkled sheets and a single pillow.',
       examined: false,
       onExamine: () => {
-        console.log('Examining bed: The sheets are cold and haven\'t been slept in tonight.');
+        const description = SimpleDialogueContent.getObjectDescription('bed');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining bed: The sheets are cold and haven\'t been slept in tonight.');
+        }
       },
       highlightOnHover: true
     };
@@ -276,14 +319,21 @@ export class ObjectFactory {
     chairGroup.position.set(x, y, z);
     chairGroup.userData.interactableId = id;
     
+    const dialogueDescription = SimpleDialogueContent.getObjectDescription('chair');
+    
     return {
       id,
       mesh: chairGroup,
       name: 'Chair',
-      description: 'A simple office chair. The seat shows signs of heavy use.',
+      description: dialogueDescription || 'A simple office chair. The seat shows signs of heavy use.',
       examined: false,
       onExamine: () => {
-        console.log('Examining chair: Worn but functional. Countless hours were spent here.');
+        const description = SimpleDialogueContent.getObjectDescription('chair');
+        if (description) {
+          console.log(description);
+        } else {
+          console.log('Examining chair: Worn but functional. Countless hours were spent here.');
+        }
       },
       highlightOnHover: true
     };

@@ -31,58 +31,8 @@ async function initGame(): Promise<void> {
     // Set up proximity feedback
     setupProximityFeedback(interactionSystem);
     
-    // Connect input to interaction system
-    game.getInputHandler().onClickCallback((x: number, y: number) => {
-        const camera = game.getCamera();
-        const canvas = game.getRenderer().domElement;
-        
-        // Convert screen coordinates to normalized device coordinates
-        const mouse = new THREE.Vector2();
-        mouse.x = (x / canvas.clientWidth) * 2 - 1;
-        mouse.y = -(y / canvas.clientHeight) * 2 + 1;
-        
-        // Get all registered objects for raycasting
-        const registeredObjects = interactionSystem.getRegisteredObjects();
-        const meshes: THREE.Object3D[] = [];
-        
-        registeredObjects.forEach(obj => {
-            // Add the main mesh and all its children for raycasting
-            meshes.push(obj.mesh);
-            obj.mesh.traverse((child) => {
-                if (child.type === 'Mesh') {
-                    meshes.push(child);
-                }
-            });
-        });
-        
-        // Perform raycasting
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(meshes, false);
-        
-        if (intersects.length > 0) {
-            // Find which registered object was hit
-            const hitMesh = intersects[0].object;
-            let hitObject = null;
-            
-            // Check if the hit object is a registered object directly
-            hitObject = interactionSystem.getObjectByMesh(hitMesh);
-            
-            // If not found, check if it's a child of a registered object
-            if (!hitObject) {
-                let parent = hitMesh.parent;
-                while (parent && !hitObject) {
-                    hitObject = interactionSystem.getObjectByMesh(parent);
-                    parent = parent.parent;
-                }
-            }
-            
-            if (hitObject) {
-                console.log('Clicked on:', hitObject.name);
-                interactionSystem.handleClick(hitObject);
-            }
-        }
-    });
+    // Connect E key to interaction system
+    setupInteractionControls(game, interactionSystem);
     
     // Start the game
     game.start();
@@ -196,8 +146,42 @@ function setupCollisions(game: Game, interactionSystem: InteractionSystem): void
     console.log(`Collision detection enabled for ${registeredObjects.length} objects`);
 }
 
+function setupInteractionControls(game: Game, interactionSystem: InteractionSystem): void {
+    const inputHandler = game.getInputHandler();
+    
+    // Handle E key press for interaction
+    document.addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 'e') {
+            const success = interactionSystem.triggerInteraction();
+            if (success) {
+                console.log('Interaction triggered with E key');
+            }
+        }
+    });
+    
+    console.log('E-key interaction controls initialized');
+}
+
 function setupProximityFeedback(interactionSystem: InteractionSystem): void {
-    // Set up proximity event handlers
+    const interactionHint = document.getElementById('interaction-hint');
+    
+    // Set up focus change event handlers
+    interactionSystem.onFocusChange((object, previous) => {
+        if (object) {
+            console.log(`Focused on: ${object.name}`);
+            if (interactionHint) {
+                interactionHint.textContent = `Press E to examine: ${object.name}`;
+                interactionHint.style.display = 'block';
+            }
+        } else {
+            console.log('No object in focus');
+            if (interactionHint) {
+                interactionHint.style.display = 'none';
+            }
+        }
+    });
+    
+    // Set up proximity event handlers for debug
     interactionSystem.onProximityEnter((object) => {
         console.log(`Near interactive object: ${object.name}`);
     });
@@ -206,12 +190,12 @@ function setupProximityFeedback(interactionSystem: InteractionSystem): void {
         console.log(`Left interactive object: ${object.name}`);
     });
     
-    console.log('Proximity detection system initialized');
+    console.log('Focus-based interaction system initialized');
 }
 
 function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem): void {
     // Listen for object interactions and update story flags
-    interactionSystem.onClick((object) => {
+    interactionSystem.onInteraction((object) => {
         console.log(`Interacted with: ${object.name}`);
         storySystem.setFlag(`${object.id}_interacted`, true);
         storySystem.discoverObject(object.id);
@@ -269,7 +253,9 @@ function updateDebugInfo(game: Game, storySystem: StorySystem, interactionSystem
             const discovered = storySystem.getDiscoveredObjects().size;
             const currentAct = storySystem.getCurrentAct();
             const nearbyCount = interactionSystem.getNearbyObjects().length;
-            objectsElement.textContent = `Act ${currentAct} | Objects: ${discovered}/7 | Nearby: ${nearbyCount}`;
+            const focusedName = interactionSystem.getFocusedObjectName();
+            const focusText = focusedName ? ` | Focus: ${focusedName}` : '';
+            objectsElement.textContent = `Act ${currentAct} | Objects: ${discovered}/7 | Nearby: ${nearbyCount}${focusText}`;
         }
         
         requestAnimationFrame(update);

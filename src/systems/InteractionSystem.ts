@@ -3,41 +3,55 @@ import { InteractableObject } from '../types/interfaces';
 
 export class InteractionSystem {
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
-  private mouse: THREE.Vector2 = new THREE.Vector2();
   private registeredObjects: InteractableObject[] = [];
-  private hoveredObject: InteractableObject | null = null;
+  private focusedObject: InteractableObject | null = null; // Single focused object
   private nearbyObjects: Set<InteractableObject> = new Set();
   
-  private hoverCallbacks: Array<(object: InteractableObject) => void> = [];
-  private unhoverCallbacks: Array<(object: InteractableObject) => void> = [];
-  private clickCallbacks: Array<(object: InteractableObject) => void> = [];
+  private focusChangeCallbacks: Array<(object: InteractableObject | null, previous: InteractableObject | null) => void> = [];
+  private interactionCallbacks: Array<(object: InteractableObject) => void> = [];
   private proximityEnterCallbacks: Array<(object: InteractableObject) => void> = [];
   private proximityExitCallbacks: Array<(object: InteractableObject) => void> = [];
   
-  private proximityDistance: number = 2.0; // Distance for proximity detection
+  private proximityDistance: number = 3.0; // Distance for proximity detection
+  private focusDistance: number = 4.0; // Maximum distance for focus
 
-  // Raycasting and interaction detection
-  checkInteraction(
-    camera: THREE.Camera,
-    mouseX: number,
-    mouseY: number,
-    interactables: THREE.Object3D[]
-  ): InteractableObject | null {
-    // Convert mouse position to normalized device coordinates
-    this.mouse.x = (mouseX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(mouseY / window.innerHeight) * 2 + 1;
+  // Center-focused interaction detection
+  updateFocus(camera: THREE.Camera, playerPosition: THREE.Vector3): void {
+    let bestObject: InteractableObject | null = null;
+    let bestScore = Infinity;
     
-    // Cast ray from camera
-    this.raycaster.setFromCamera(this.mouse, camera);
+    // Cast ray from center of screen
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     
-    // Check for intersections
-    const intersects = this.raycaster.intersectObjects(interactables, true);
+    // Check each nearby object for focus
+    this.nearbyObjects.forEach(object => {
+      const distance = playerPosition.distanceTo(object.mesh.position);
+      
+      // Only consider objects within focus distance
+      if (distance > this.focusDistance) return;
+      
+      // Check if object is in the center of view using raycasting
+      const intersects = this.raycaster.intersectObject(object.mesh, true);
+      
+      if (intersects.length > 0) {
+        // Calculate angular distance from center (how close to center of screen)
+        const objectScreenPos = object.mesh.position.clone().project(camera);
+        const centerDistance = Math.abs(objectScreenPos.x) + Math.abs(objectScreenPos.y);
+        
+        // Combine distance and center alignment for scoring
+        const score = distance * 0.7 + centerDistance * 2.0;
+        
+        if (score < bestScore) {
+          bestScore = score;
+          bestObject = object;
+        }
+      }
+    });
     
-    if (intersects.length > 0) {
-      return this.getObjectByMesh(intersects[0].object);
+    // Update focused object if it changed
+    if (bestObject !== this.focusedObject) {
+      this.setFocusedObject(bestObject);
     }
-    
-    return null;
   }
 
   // Object highlighting
@@ -72,31 +86,43 @@ export class InteractionSystem {
     }
   }
 
-  // Hovered object management
-  setHoveredObject(object: InteractableObject | null): void {
-    if (this.hoveredObject === object) return;
+  // Focused object management (single object focus)
+  setFocusedObject(object: InteractableObject | null): void {
+    const previousObject = this.focusedObject;
+    
+    if (previousObject === object) return;
     
     // Remove highlight from previous object
-    if (this.hoveredObject) {
-      this.removeHighlight(this.hoveredObject);
-      this.emitUnhover(this.hoveredObject);
+    if (previousObject) {
+      this.removeFocusHighlight(previousObject);
     }
     
-    this.hoveredObject = object;
+    this.focusedObject = object;
     
-    // Highlight new object
+    // Highlight new focused object
     if (object) {
-      this.highlightObject(object);
-      this.emitHover(object);
+      this.addFocusHighlight(object);
     }
+    
+    // Emit focus change event
+    this.emitFocusChange(object, previousObject);
   }
 
-  getHoveredObject(): InteractableObject | null {
-    return this.hoveredObject;
+  getFocusedObject(): InteractableObject | null {
+    return this.focusedObject;
   }
 
-  clearHoveredObject(): void {
-    this.setHoveredObject(null);
+  clearFocusedObject(): void {
+    this.setFocusedObject(null);
+  }
+
+  // Interaction trigger (E key)
+  triggerInteraction(): boolean {
+    if (this.focusedObject) {
+      this.handleInteraction(this.focusedObject);
+      return true;
+    }
+    return false;
   }
 
   // Object registration
@@ -124,37 +150,6 @@ export class InteractionSystem {
     return this.registeredObjects.find(obj => obj.mesh === mesh) || null;
   }
 
-  // Event handling
-  onHover(callback: (object: InteractableObject) => void): void {
-    this.hoverCallbacks.push(callback);
-  }
-
-  onUnhover(callback: (object: InteractableObject) => void): void {
-    this.unhoverCallbacks.push(callback);
-  }
-
-  onClick(callback: (object: InteractableObject) => void): void {
-    this.clickCallbacks.push(callback);
-  }
-
-  private emitHover(object: InteractableObject): void {
-    this.hoverCallbacks.forEach(callback => callback(object));
-  }
-
-  private emitUnhover(object: InteractableObject): void {
-    this.unhoverCallbacks.forEach(callback => callback(object));
-  }
-
-  private emitClick(object: InteractableObject): void {
-    this.clickCallbacks.forEach(callback => callback(object));
-  }
-
-  // Click handling
-  handleClick(object: InteractableObject): void {
-    object.onExamine();
-    object.examined = true;
-    this.emitClick(object);
-  }
 
   // Distance checking
   isWithinInteractionDistance(
@@ -198,10 +193,10 @@ export class InteractionSystem {
     this.nearbyObjects = currentNearby;
   }
 
-  private addProximityHighlight(object: InteractableObject): void {
+  private addFocusHighlight(object: InteractableObject): void {
     if (!object.highlightOnHover) return;
     
-    // Create outline effect using edge geometry
+    // Create bright focus outline
     this.traverseMeshesOnly(object.mesh, (mesh) => {
       // Skip outline meshes to avoid recursion
       if (mesh.userData.isOutline) return;
@@ -211,27 +206,79 @@ export class InteractionSystem {
         mesh.userData.originalMaterial = mesh.material;
       }
       
-      // Create outline material only once
-      if (!mesh.userData.outlineMesh) {
-        const outlineMaterial = new THREE.MeshBasicMaterial({
-          color: 0x00ff88,
+      // Create focus outline material only once
+      if (!mesh.userData.focusOutlineMesh) {
+        const focusOutlineMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00ff88, // Bright green for focused object
           side: THREE.BackSide,
           transparent: true,
-          opacity: 0.3
+          opacity: 0.6
         });
         
         // Create slightly larger geometry for outline
-        const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterial);
-        outlineMesh.scale.set(1.05, 1.05, 1.05);
-        outlineMesh.userData.isOutline = true;
+        const focusOutlineMesh = new THREE.Mesh(mesh.geometry, focusOutlineMaterial);
+        focusOutlineMesh.scale.set(1.08, 1.08, 1.08);
+        focusOutlineMesh.userData.isOutline = true;
         
-        mesh.userData.outlineMesh = outlineMesh;
-        mesh.add(outlineMesh);
+        mesh.userData.focusOutlineMesh = focusOutlineMesh;
+        mesh.add(focusOutlineMesh);
       }
       
-      // Make outline visible
-      if (mesh.userData.outlineMesh) {
-        mesh.userData.outlineMesh.visible = true;
+      // Make focus outline visible
+      if (mesh.userData.focusOutlineMesh) {
+        mesh.userData.focusOutlineMesh.visible = true;
+      }
+    });
+  }
+
+  private removeFocusHighlight(object: InteractableObject): void {
+    this.traverseMeshesOnly(object.mesh, (mesh) => {
+      // Skip outline meshes
+      if (mesh.userData.isOutline) return;
+      
+      // Hide focus outline
+      if (mesh.userData.focusOutlineMesh) {
+        mesh.userData.focusOutlineMesh.visible = false;
+      }
+    });
+  }
+
+  private addProximityHighlight(object: InteractableObject): void {
+    if (!object.highlightOnHover) return;
+    
+    // Create subtle proximity outline (only if not focused)
+    if (object === this.focusedObject) return;
+    
+    this.traverseMeshesOnly(object.mesh, (mesh) => {
+      // Skip outline meshes to avoid recursion
+      if (mesh.userData.isOutline) return;
+      
+      // Store original material if not already stored
+      if (!mesh.userData.originalMaterial) {
+        mesh.userData.originalMaterial = mesh.material;
+      }
+      
+      // Create proximity outline material only once
+      if (!mesh.userData.proximityOutlineMesh) {
+        const proximityOutlineMaterial = new THREE.MeshBasicMaterial({
+          color: 0x888888, // Dim gray for nearby objects
+          side: THREE.BackSide,
+          transparent: true,
+          opacity: 0.2
+        });
+        
+        // Create slightly larger geometry for outline
+        const proximityOutlineMesh = new THREE.Mesh(mesh.geometry, proximityOutlineMaterial);
+        proximityOutlineMesh.scale.set(1.03, 1.03, 1.03);
+        proximityOutlineMesh.userData.isOutline = true;
+        
+        mesh.userData.proximityOutlineMesh = proximityOutlineMesh;
+        mesh.add(proximityOutlineMesh);
+      }
+      
+      // Make proximity outline visible
+      if (mesh.userData.proximityOutlineMesh) {
+        mesh.userData.proximityOutlineMesh.visible = true;
       }
     });
   }
@@ -241,9 +288,9 @@ export class InteractionSystem {
       // Skip outline meshes
       if (mesh.userData.isOutline) return;
       
-      // Hide outline
-      if (mesh.userData.outlineMesh) {
-        mesh.userData.outlineMesh.visible = false;
+      // Hide proximity outline
+      if (mesh.userData.proximityOutlineMesh) {
+        mesh.userData.proximityOutlineMesh.visible = false;
       }
     });
   }
@@ -262,13 +309,29 @@ export class InteractionSystem {
     }
   }
 
-  // Event handlers for proximity
+  // Event handlers
+  onFocusChange(callback: (object: InteractableObject | null, previous: InteractableObject | null) => void): void {
+    this.focusChangeCallbacks.push(callback);
+  }
+
+  onInteraction(callback: (object: InteractableObject) => void): void {
+    this.interactionCallbacks.push(callback);
+  }
+
   onProximityEnter(callback: (object: InteractableObject) => void): void {
     this.proximityEnterCallbacks.push(callback);
   }
 
   onProximityExit(callback: (object: InteractableObject) => void): void {
     this.proximityExitCallbacks.push(callback);
+  }
+
+  private emitFocusChange(object: InteractableObject | null, previous: InteractableObject | null): void {
+    this.focusChangeCallbacks.forEach(callback => callback(object, previous));
+  }
+
+  private emitInteraction(object: InteractableObject): void {
+    this.interactionCallbacks.forEach(callback => callback(object));
   }
 
   private emitProximityEnter(object: InteractableObject): void {
@@ -283,15 +346,48 @@ export class InteractionSystem {
     return Array.from(this.nearbyObjects);
   }
 
+  // Check if interaction is available
+  canInteract(): boolean {
+    return this.focusedObject !== null;
+  }
+
+  // Get name of focused object for UI display
+  getFocusedObjectName(): string | null {
+    return this.focusedObject ? this.focusedObject.name : null;
+  }
+
+  // Handle interaction (E key pressed)
+  private handleInteraction(object: InteractableObject): void {
+    object.onExamine();
+    object.examined = true;
+    this.emitInteraction(object);
+  }
+
   // Update method for game loop
   update(deltaTime: number): void {
-    // Any per-frame updates for interaction system
-    // Could include animation of highlighted objects, etc.
+    // Animate focus highlight with pulsing
+    if (this.focusedObject) {
+      this.animateFocusHighlight(this.focusedObject, deltaTime);
+    }
+  }
+
+  private animateFocusHighlight(object: InteractableObject, deltaTime: number): void {
+    const time = performance.now() * 0.003; // Moderate pulsing for focus
+    const opacity = 0.5 + Math.sin(time) * 0.2; // Pulse between 0.3 and 0.7
+    
+    this.traverseMeshesOnly(object.mesh, (mesh) => {
+      if (mesh.userData.focusOutlineMesh) {
+        const outlineMaterial = mesh.userData.focusOutlineMesh.material as THREE.MeshBasicMaterial;
+        if (outlineMaterial) {
+          outlineMaterial.opacity = opacity;
+        }
+      }
+    });
   }
 
   // Dispose method for cleanup
   dispose(): void {
-    this.clearHoveredObject();
+    this.clearFocusedObject();
     
     // Clear all proximity highlights
     this.nearbyObjects.forEach(object => {
@@ -300,9 +396,8 @@ export class InteractionSystem {
     
     this.registeredObjects = [];
     this.nearbyObjects.clear();
-    this.hoverCallbacks = [];
-    this.unhoverCallbacks = [];
-    this.clickCallbacks = [];
+    this.focusChangeCallbacks = [];
+    this.interactionCallbacks = [];
     this.proximityEnterCallbacks = [];
     this.proximityExitCallbacks = [];
   }

@@ -45,13 +45,17 @@
         <h1>The Room Beyond</h1>
         <p>Click canvas to lock mouse, then use WASD to move</p>
         <p>Move mouse to look around, ESC to unlock</p>
-        <p>Examine objects to uncover memories and progress the story</p>
+        <p>Look at objects to focus them (bright green), press E to examine</p>
     </div>
     
     <div id="debug">
         <div id="fps">FPS: 0</div>
         <div id="position">Position: 0, 0, 0</div>
         <div id="objects">Objects: 0</div>
+    </div>
+    
+    <div id="interaction-hint" style="position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); color: #00ff88; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); display: none; z-index: 200;">
+        Press E to examine
     </div>
     
     <script type="module" src="/src/main.ts"></script>

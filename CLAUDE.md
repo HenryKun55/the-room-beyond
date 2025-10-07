@@ -9,8 +9,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **Read `docs/` folder contents** - Contains all project specifications
 2. **Read `PROJECT_OVERVIEW.md`** - Core project concept and structure  
 3. **Read `README.md`** - Complete development workflow and commands
+4. **Read `DEVELOPMENT_STATUS.md`** - Current completion status and roadmap
 
 **NEVER deviate from the established patterns, architecture, or requirements defined in these documents.**
+
+## 🔄 MANDATORY: Update Development Status
+
+**AFTER implementing any feature, bug fix, or change, you MUST:**
+
+1. **Update `DEVELOPMENT_STATUS.md`** with current progress
+2. **Move completed items** from "PENDING" to "COMPLETED" 
+3. **Update progress percentages** for each major section
+4. **Add new issues** to "KNOWN ISSUES" if discovered
+5. **Update milestone targets** if timeline changes
+
+This ensures accurate tracking of development progress and completion status.
 
 ### Required Documentation Files:
 - `docs/STORY.md` - Complete narrative and dialogue

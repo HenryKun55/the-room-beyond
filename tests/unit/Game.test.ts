@@ -20,7 +20,11 @@ jest.mock('@systems/InteractionSystem', () => ({
     update: jest.fn(),
     dispose: jest.fn(),
     checkProximity: jest.fn(),
-    getNearbyObjects: jest.fn(() => [])
+    updateFocus: jest.fn(),
+    getNearbyObjects: jest.fn(() => []),
+    getFocusedObjectName: jest.fn(() => null),
+    canInteract: jest.fn(() => false),
+    triggerInteraction: jest.fn(() => false)
   }))
 }));
 

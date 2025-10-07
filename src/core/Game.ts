@@ -80,10 +80,12 @@ export class Game {
     // Update camera controller
     this.cameraController.update(deltaTime);
     
-    // Update interaction system with proximity detection
+    // Update interaction system with proximity and focus detection
     if (this.interactionSystem) {
+      const playerPosition = this.cameraController.getPosition();
       this.interactionSystem.update(deltaTime);
-      this.interactionSystem.checkProximity(this.cameraController.getPosition());
+      this.interactionSystem.checkProximity(playerPosition);
+      this.interactionSystem.updateFocus(this.camera, playerPosition);
     }
   }
 

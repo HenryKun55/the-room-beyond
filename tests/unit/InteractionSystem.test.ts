@@ -2,9 +2,10 @@
 jest.mock('three', () => ({
   Raycaster: jest.fn(() => ({
     setFromCamera: jest.fn(),
-    intersectObjects: jest.fn(() => [])
+    intersectObjects: jest.fn(() => []),
+    intersectObject: jest.fn(() => [{ distance: 1, object: {} }])
   })),
-  Vector2: jest.fn(() => ({ x: 0, y: 0 })),
+  Vector2: jest.fn((x = 0, y = 0) => ({ x, y })),
   Vector3: jest.fn((x = 0, y = 0, z = 0) => ({
     x, y, z,
     distanceTo: jest.fn((other) => {
@@ -12,8 +13,24 @@ jest.mock('three', () => ({
       const dy = y - other.y;
       const dz = z - other.z;
       return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    })
-  }))
+    }),
+    clone: jest.fn(() => ({ x, y, z, project: jest.fn(() => ({ x: 0, y: 0 })) }))
+  })),
+  MeshBasicMaterial: jest.fn(() => ({
+    color: 0xffffff,
+    side: 0,
+    transparent: false,
+    opacity: 1
+  })),
+  Mesh: jest.fn(() => ({
+    geometry: {},
+    material: {},
+    scale: { set: jest.fn() },
+    userData: {},
+    add: jest.fn(),
+    visible: true
+  })),
+  BackSide: 1
 }));
 
 import { InteractionSystem } from '@systems/InteractionSystem';
@@ -25,11 +42,18 @@ describe('InteractionSystem', () => {
   beforeEach(() => {
     interactionSystem = new InteractionSystem();
     
+    const THREE = require('three');
     mockObject = {
       id: 'test_object',
       mesh: {
         userData: { interactableId: 'test_object' },
-        position: { x: 0, y: 0, z: 0 }
+        position: new THREE.Vector3(0, 0, 0),
+        type: 'Mesh',
+        children: [],
+        material: {},
+        geometry: {},
+        add: jest.fn(),
+        remove: jest.fn()
       },
       name: 'Test Object',
       description: 'A test object',
@@ -73,49 +97,95 @@ describe('InteractionSystem', () => {
     });
   });
 
-  describe('Hover Management', () => {
-    test('should track currently hovered object', () => {
-      interactionSystem.setHoveredObject(mockObject);
+  describe('Focus Management', () => {
+    test('should track currently focused object', () => {
+      interactionSystem.setFocusedObject(mockObject);
       
-      expect(interactionSystem.getHoveredObject()).toBe(mockObject);
+      expect(interactionSystem.getFocusedObject()).toBe(mockObject);
     });
 
-    test('should clear hovered object', () => {
-      interactionSystem.setHoveredObject(mockObject);
-      interactionSystem.clearHoveredObject();
+    test('should clear focused object', () => {
+      interactionSystem.setFocusedObject(mockObject);
+      interactionSystem.clearFocusedObject();
       
-      expect(interactionSystem.getHoveredObject()).toBeNull();
+      expect(interactionSystem.getFocusedObject()).toBeNull();
+    });
+
+    test('should check if interaction is available', () => {
+      expect(interactionSystem.canInteract()).toBe(false);
+      
+      interactionSystem.setFocusedObject(mockObject);
+      expect(interactionSystem.canInteract()).toBe(true);
+      
+      interactionSystem.clearFocusedObject();
+      expect(interactionSystem.canInteract()).toBe(false);
+    });
+
+    test('should get focused object name', () => {
+      expect(interactionSystem.getFocusedObjectName()).toBeNull();
+      
+      interactionSystem.setFocusedObject(mockObject);
+      expect(interactionSystem.getFocusedObjectName()).toBe('Test Object');
     });
   });
 
   describe('Interaction Events', () => {
-    test('should emit hover events', () => {
-      const hoverCallback = jest.fn();
-      interactionSystem.onHover(hoverCallback);
+    test('should emit focus change events', () => {
+      const focusCallback = jest.fn();
+      interactionSystem.onFocusChange(focusCallback);
       
-      interactionSystem.setHoveredObject(mockObject);
+      interactionSystem.setFocusedObject(mockObject);
       
-      expect(hoverCallback).toHaveBeenCalledWith(mockObject);
+      expect(focusCallback).toHaveBeenCalledWith(mockObject, null);
     });
 
-    test('should emit unhover events', () => {
-      const unhoverCallback = jest.fn();
-      interactionSystem.onUnhover(unhoverCallback);
+    test('should emit proximity enter events', () => {
+      const proximityEnterCallback = jest.fn();
+      interactionSystem.onProximityEnter(proximityEnterCallback);
       
-      interactionSystem.setHoveredObject(mockObject);
-      interactionSystem.clearHoveredObject();
+      const THREE = require('three');
+      const playerPosition = new THREE.Vector3(0, 0, 0);
+      mockObject.mesh.position = new THREE.Vector3(1, 0, 0); // Within proximity distance
       
-      expect(unhoverCallback).toHaveBeenCalledWith(mockObject);
+      interactionSystem.registerObject(mockObject);
+      interactionSystem.checkProximity(playerPosition);
+      
+      expect(proximityEnterCallback).toHaveBeenCalledWith(mockObject);
     });
 
-    test('should emit click events', () => {
-      const clickCallback = jest.fn();
-      interactionSystem.onClick(clickCallback);
+    test('should emit proximity exit events', () => {
+      const proximityExitCallback = jest.fn();
+      interactionSystem.onProximityExit(proximityExitCallback);
       
-      interactionSystem.handleClick(mockObject);
+      const THREE = require('three');
+      const playerPosition = new THREE.Vector3(0, 0, 0);
       
-      expect(clickCallback).toHaveBeenCalledWith(mockObject);
+      // First, get object into proximity
+      mockObject.mesh.position = new THREE.Vector3(1, 0, 0);
+      interactionSystem.registerObject(mockObject);
+      interactionSystem.checkProximity(playerPosition);
+      
+      // Then move it out of proximity
+      mockObject.mesh.position = new THREE.Vector3(10, 0, 0);
+      interactionSystem.checkProximity(playerPosition);
+      
+      expect(proximityExitCallback).toHaveBeenCalledWith(mockObject);
+    });
+
+    test('should trigger interaction with E key', () => {
+      const interactionCallback = jest.fn();
+      interactionSystem.onInteraction(interactionCallback);
+      
+      // No focused object - should return false
+      expect(interactionSystem.triggerInteraction()).toBe(false);
+      
+      // With focused object - should trigger interaction
+      interactionSystem.setFocusedObject(mockObject);
+      expect(interactionSystem.triggerInteraction()).toBe(true);
+      
       expect(mockObject.onExamine).toHaveBeenCalled();
+      expect(mockObject.examined).toBe(true);
+      expect(interactionCallback).toHaveBeenCalledWith(mockObject);
     });
   });
 

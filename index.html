@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Room Beyond</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #debug {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #0f0;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <h1>The Room Beyond</h1>
+        <p>Click canvas to lock mouse, then use WASD to move</p>
+        <p>Move mouse to look around, ESC to unlock</p>
+        <p>Click objects to interact</p>
+    </div>
+    
+    <div id="debug">
+        <div id="fps">FPS: 0</div>
+        <div id="position">Position: 0, 0, 0</div>
+        <div id="objects">Objects: 0</div>
+    </div>
+    
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

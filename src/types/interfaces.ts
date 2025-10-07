@@ -66,9 +66,18 @@ export interface DialogueNode {
 
 export interface DialogueChoice {
   text: string;
-  next: string;
-  condition?: () => boolean;
+  nextNodeId: string;
+  condition?: string;
 }
+
+export interface DialogueState {
+  currentNodeId: string | null;
+  history: string[];
+  isActive: boolean;
+}
+
+export type DialogueEventType = 'dialogueStart' | 'dialogueEnd' | 'nodeChange';
+export type DialogueEventCallback = (data?: any, previousData?: any) => void;
 
 // Story system interfaces
 export interface StoryFlag {

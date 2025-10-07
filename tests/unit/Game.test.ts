@@ -1,4 +1,29 @@
 import '../helpers/mockThree';
+
+// Mock CameraController
+jest.mock('@core/CameraController', () => ({
+  CameraController: jest.fn(() => ({
+    update: jest.fn(),
+    dispose: jest.fn(),
+    getPosition: jest.fn(() => ({ x: 0, y: 1.6, z: 0 })),
+    getDirection: jest.fn(() => ({ x: 0, y: 0, z: -1 })),
+    addCollisionObject: jest.fn(),
+    setCollisionObjects: jest.fn(),
+    setPosition: jest.fn(),
+    setRotation: jest.fn()
+  }))
+}));
+
+// Mock InteractionSystem
+jest.mock('@systems/InteractionSystem', () => ({
+  InteractionSystem: jest.fn(() => ({
+    update: jest.fn(),
+    dispose: jest.fn(),
+    checkProximity: jest.fn(),
+    getNearbyObjects: jest.fn(() => [])
+  }))
+}));
+
 import { Game } from '@core/Game';
 
 describe('Game', () => {

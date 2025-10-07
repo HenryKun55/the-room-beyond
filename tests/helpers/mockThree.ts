@@ -26,7 +26,9 @@ export const mockScene = {
 export const mockCamera = {
   position: { x: 0, y: 1.6, z: 0, set: jest.fn() },
   aspect: 1,
-  updateProjectionMatrix: jest.fn()
+  updateProjectionMatrix: jest.fn(),
+  quaternion: { copy: jest.fn() },
+  getWorldDirection: jest.fn()
 };
 
 export const mockCanvas = () => {
@@ -42,5 +44,47 @@ jest.mock('three', () => ({
   Scene: jest.fn(() => mockScene),
   PerspectiveCamera: jest.fn(() => mockCamera),
   Color: jest.fn(),
-  PCFSoftShadowMap: 'PCFSoftShadowMap'
+  PCFSoftShadowMap: 'PCFSoftShadowMap',
+  Vector3: jest.fn((x = 0, y = 0, z = 0) => ({
+    x, y, z,
+    set: jest.fn(),
+    add: jest.fn(),
+    sub: jest.fn(),
+    normalize: jest.fn(),
+    multiplyScalar: jest.fn(),
+    length: jest.fn(() => 1),
+    clone: jest.fn(() => ({ x, y, z })),
+    copy: jest.fn(),
+    crossVectors: jest.fn(),
+    distanceTo: jest.fn(() => 1)
+  })),
+  Quaternion: jest.fn(() => ({
+    setFromAxisAngle: jest.fn(),
+    multiplyQuaternions: jest.fn(),
+    copy: jest.fn()
+  })),
+  Vector2: jest.fn(() => ({
+    x: 0, y: 0,
+    set: jest.fn()
+  })),
+  Raycaster: jest.fn(() => ({
+    setFromCamera: jest.fn(),
+    intersectObjects: jest.fn(() => [])
+  })),
+  Box3: jest.fn(() => {
+    const mockBox = {
+      setFromObject: jest.fn(() => mockBox),
+      expandByScalar: jest.fn(() => mockBox),
+      containsPoint: jest.fn(() => false)
+    };
+    return mockBox;
+  }),
+  MeshBasicMaterial: jest.fn(() => ({
+    type: 'MeshBasicMaterial',
+    color: { setHex: jest.fn() },
+    side: 0,
+    transparent: false,
+    opacity: 1
+  })),
+  BackSide: 1
 }));

@@ -6,10 +6,15 @@ export class InteractionSystem {
   private mouse: THREE.Vector2 = new THREE.Vector2();
   private registeredObjects: InteractableObject[] = [];
   private hoveredObject: InteractableObject | null = null;
+  private nearbyObjects: Set<InteractableObject> = new Set();
   
   private hoverCallbacks: Array<(object: InteractableObject) => void> = [];
   private unhoverCallbacks: Array<(object: InteractableObject) => void> = [];
   private clickCallbacks: Array<(object: InteractableObject) => void> = [];
+  private proximityEnterCallbacks: Array<(object: InteractableObject) => void> = [];
+  private proximityExitCallbacks: Array<(object: InteractableObject) => void> = [];
+  
+  private proximityDistance: number = 2.0; // Distance for proximity detection
 
   // Raycasting and interaction detection
   checkInteraction(
@@ -162,6 +167,122 @@ export class InteractionSystem {
     return distance <= maxDistance;
   }
 
+  // Proximity Detection
+  checkProximity(playerPosition: THREE.Vector3): void {
+    const currentNearby = new Set<InteractableObject>();
+    
+    // Check each object for proximity
+    this.registeredObjects.forEach(object => {
+      const distance = playerPosition.distanceTo(object.mesh.position);
+      
+      if (distance <= this.proximityDistance) {
+        currentNearby.add(object);
+        
+        // If object just entered proximity
+        if (!this.nearbyObjects.has(object)) {
+          this.addProximityHighlight(object);
+          this.emitProximityEnter(object);
+        }
+      }
+    });
+    
+    // Check for objects that left proximity
+    this.nearbyObjects.forEach(object => {
+      if (!currentNearby.has(object)) {
+        this.removeProximityHighlight(object);
+        this.emitProximityExit(object);
+      }
+    });
+    
+    // Update nearby objects set
+    this.nearbyObjects = currentNearby;
+  }
+
+  private addProximityHighlight(object: InteractableObject): void {
+    if (!object.highlightOnHover) return;
+    
+    // Create outline effect using edge geometry
+    this.traverseMeshesOnly(object.mesh, (mesh) => {
+      // Skip outline meshes to avoid recursion
+      if (mesh.userData.isOutline) return;
+      
+      // Store original material if not already stored
+      if (!mesh.userData.originalMaterial) {
+        mesh.userData.originalMaterial = mesh.material;
+      }
+      
+      // Create outline material only once
+      if (!mesh.userData.outlineMesh) {
+        const outlineMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00ff88,
+          side: THREE.BackSide,
+          transparent: true,
+          opacity: 0.3
+        });
+        
+        // Create slightly larger geometry for outline
+        const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterial);
+        outlineMesh.scale.set(1.05, 1.05, 1.05);
+        outlineMesh.userData.isOutline = true;
+        
+        mesh.userData.outlineMesh = outlineMesh;
+        mesh.add(outlineMesh);
+      }
+      
+      // Make outline visible
+      if (mesh.userData.outlineMesh) {
+        mesh.userData.outlineMesh.visible = true;
+      }
+    });
+  }
+
+  private removeProximityHighlight(object: InteractableObject): void {
+    this.traverseMeshesOnly(object.mesh, (mesh) => {
+      // Skip outline meshes
+      if (mesh.userData.isOutline) return;
+      
+      // Hide outline
+      if (mesh.userData.outlineMesh) {
+        mesh.userData.outlineMesh.visible = false;
+      }
+    });
+  }
+
+  // Helper method to traverse only mesh objects and avoid recursion
+  private traverseMeshesOnly(object: THREE.Object3D, callback: (mesh: THREE.Mesh) => void): void {
+    if (object.type === 'Mesh' && !object.userData.isOutline) {
+      callback(object as THREE.Mesh);
+    }
+    
+    // Only traverse direct children, not outline meshes
+    for (const child of object.children) {
+      if (!child.userData.isOutline) {
+        this.traverseMeshesOnly(child, callback);
+      }
+    }
+  }
+
+  // Event handlers for proximity
+  onProximityEnter(callback: (object: InteractableObject) => void): void {
+    this.proximityEnterCallbacks.push(callback);
+  }
+
+  onProximityExit(callback: (object: InteractableObject) => void): void {
+    this.proximityExitCallbacks.push(callback);
+  }
+
+  private emitProximityEnter(object: InteractableObject): void {
+    this.proximityEnterCallbacks.forEach(callback => callback(object));
+  }
+
+  private emitProximityExit(object: InteractableObject): void {
+    this.proximityExitCallbacks.forEach(callback => callback(object));
+  }
+
+  getNearbyObjects(): InteractableObject[] {
+    return Array.from(this.nearbyObjects);
+  }
+
   // Update method for game loop
   update(deltaTime: number): void {
     // Any per-frame updates for interaction system
@@ -171,9 +292,18 @@ export class InteractionSystem {
   // Dispose method for cleanup
   dispose(): void {
     this.clearHoveredObject();
+    
+    // Clear all proximity highlights
+    this.nearbyObjects.forEach(object => {
+      this.removeProximityHighlight(object);
+    });
+    
     this.registeredObjects = [];
+    this.nearbyObjects.clear();
     this.hoverCallbacks = [];
     this.unhoverCallbacks = [];
     this.clickCallbacks = [];
+    this.proximityEnterCallbacks = [];
+    this.proximityExitCallbacks = [];
   }
 }

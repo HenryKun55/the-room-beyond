@@ -20,6 +20,11 @@ export class CameraController {
   private isPointerLocked: boolean = false;
   private previousMouseX: number = 0;
   private previousMouseY: number = 0;
+  
+  // Collision detection
+  private collisionObjects: THREE.Object3D[] = [];
+  private playerRadius: number = 0.3;
+  private roomBounds = { x: 3.8, z: 3.8 }; // Room is 8x8, so bounds are ±3.8
 
   constructor(camera: THREE.PerspectiveCamera, inputHandler: InputHandler, canvas: HTMLCanvasElement) {
     this.camera = camera;
@@ -115,11 +120,15 @@ export class CameraController {
       this.velocity.normalize();
       this.velocity.multiplyScalar(this.moveSpeed * deltaSeconds);
       
-      // Apply movement to camera position
-      this.camera.position.add(this.velocity);
+      // Calculate new position
+      const newPosition = this.camera.position.clone();
+      newPosition.add(this.velocity);
+      newPosition.y = 1.6; // Keep at eye level
       
-      // Keep camera at eye level (prevent flying up/down)
-      this.camera.position.y = 1.6;
+      // Check for collisions before moving
+      if (!this.checkCollision(newPosition)) {
+        this.camera.position.copy(newPosition);
+      }
     }
   }
 
@@ -139,6 +148,44 @@ export class CameraController {
     this.yaw = yaw;
     this.pitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, pitch));
     this.updateCameraRotation();
+  }
+
+  // Collision Detection Methods
+  addCollisionObject(object: THREE.Object3D): void {
+    this.collisionObjects.push(object);
+  }
+
+  private checkCollision(position: THREE.Vector3): boolean {
+    // Check room bounds (walls)
+    if (Math.abs(position.x) > this.roomBounds.x || 
+        Math.abs(position.z) > this.roomBounds.z) {
+      return true; // Collision with walls
+    }
+
+    // Check collision with objects
+    for (const obj of this.collisionObjects) {
+      if (this.checkObjectCollision(position, obj)) {
+        return true;
+      }
+    }
+
+    return false; // No collision
+  }
+
+  private checkObjectCollision(position: THREE.Vector3, object: THREE.Object3D): boolean {
+    // Get object's bounding box
+    const box = new THREE.Box3().setFromObject(object);
+    
+    // Expand the box by player radius for collision
+    box.expandByScalar(this.playerRadius);
+    
+    // Check if player position is inside the expanded box
+    return box.containsPoint(position);
+  }
+
+  // Method to set collision objects from the scene
+  setCollisionObjects(objects: THREE.Object3D[]): void {
+    this.collisionObjects = [...objects];
   }
 
   dispose(): void {

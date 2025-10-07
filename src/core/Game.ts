@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { InputHandler } from '@core/InputHandler';
 import { CameraController } from '@core/CameraController';
+import { InteractionSystem } from '@systems/InteractionSystem';
 
 export class Game {
   public renderer: THREE.WebGLRenderer;
@@ -8,6 +9,7 @@ export class Game {
   public camera: THREE.PerspectiveCamera;
   public inputHandler: InputHandler;
   public cameraController: CameraController;
+  public interactionSystem: InteractionSystem | null = null;
   
   private running: boolean = false;
   private lastTime: number = 0;
@@ -77,6 +79,12 @@ export class Game {
   private update(deltaTime: number): void {
     // Update camera controller
     this.cameraController.update(deltaTime);
+    
+    // Update interaction system with proximity detection
+    if (this.interactionSystem) {
+      this.interactionSystem.update(deltaTime);
+      this.interactionSystem.checkProximity(this.cameraController.getPosition());
+    }
   }
 
   private render(): void {
@@ -110,10 +118,21 @@ export class Game {
     return this.cameraController;
   }
 
+  setInteractionSystem(interactionSystem: InteractionSystem): void {
+    this.interactionSystem = interactionSystem;
+  }
+
+  getInteractionSystem(): InteractionSystem | null {
+    return this.interactionSystem;
+  }
+
   dispose(): void {
     this.stop();
     this.cameraController.dispose();
     this.inputHandler.dispose();
+    if (this.interactionSystem) {
+      this.interactionSystem.dispose();
+    }
     this.renderer.dispose();
     this.scene.clear();
   }

@@ -1,6 +1,7 @@
 import { Game } from '@core/Game';
 import { StorySystem } from '@systems/StorySystem';
 import { InteractionSystem } from '@systems/InteractionSystem';
+import { ObjectFactory } from '@core/ObjectFactory';
 import * as THREE from 'three';
 
 // Main entry point for the game
@@ -16,28 +17,70 @@ async function initGame(): Promise<void> {
     // Initialize systems
     const storySystem = new StorySystem();
     const interactionSystem = new InteractionSystem();
+    const objectFactory = new ObjectFactory();
     
-    // Add a simple test scene with basic objects
-    createTestScene(game, storySystem, interactionSystem);
+    // Set interaction system reference in game
+    game.setInteractionSystem(interactionSystem);
+    
+    // Create the main room scene
+    createMainRoomScene(game, storySystem, interactionSystem, objectFactory);
+    
+    // Set up collision objects for camera controller
+    setupCollisions(game, interactionSystem);
+    
+    // Set up proximity feedback
+    setupProximityFeedback(interactionSystem);
     
     // Connect input to interaction system
     game.getInputHandler().onClickCallback((x: number, y: number) => {
         const camera = game.getCamera();
-        const scene = game.getScene();
+        const canvas = game.getRenderer().domElement;
         
-        // Get all interactable objects from the scene
-        const interactables: THREE.Object3D[] = [];
-        scene.traverse((child: THREE.Object3D) => {
-            if (child.userData.interactableId) {
-                interactables.push(child);
-            }
+        // Convert screen coordinates to normalized device coordinates
+        const mouse = new THREE.Vector2();
+        mouse.x = (x / canvas.clientWidth) * 2 - 1;
+        mouse.y = -(y / canvas.clientHeight) * 2 + 1;
+        
+        // Get all registered objects for raycasting
+        const registeredObjects = interactionSystem.getRegisteredObjects();
+        const meshes: THREE.Object3D[] = [];
+        
+        registeredObjects.forEach(obj => {
+            // Add the main mesh and all its children for raycasting
+            meshes.push(obj.mesh);
+            obj.mesh.traverse((child) => {
+                if (child.type === 'Mesh') {
+                    meshes.push(child);
+                }
+            });
         });
         
-        // Check for interaction
-        const hitObject = interactionSystem.checkInteraction(camera, x, y, interactables);
-        if (hitObject) {
-            console.log('Clicked on:', hitObject.name);
-            interactionSystem.handleClick(hitObject);
+        // Perform raycasting
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(meshes, false);
+        
+        if (intersects.length > 0) {
+            // Find which registered object was hit
+            const hitMesh = intersects[0].object;
+            let hitObject = null;
+            
+            // Check if the hit object is a registered object directly
+            hitObject = interactionSystem.getObjectByMesh(hitMesh);
+            
+            // If not found, check if it's a child of a registered object
+            if (!hitObject) {
+                let parent = hitMesh.parent;
+                while (parent && !hitObject) {
+                    hitObject = interactionSystem.getObjectByMesh(parent);
+                    parent = parent.parent;
+                }
+            }
+            
+            if (hitObject) {
+                console.log('Clicked on:', hitObject.name);
+                interactionSystem.handleClick(hitObject);
+            }
         }
     });
     
@@ -48,82 +91,149 @@ async function initGame(): Promise<void> {
     updateDebugInfo(game, storySystem, interactionSystem);
 }
 
-function createTestScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem): void {
+function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem, objectFactory: ObjectFactory): void {
     const scene = game.getScene();
     
-    // Add basic lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    // Add atmospheric lighting
+    const ambientLight = new THREE.AmbientLight(0x2a2a3a, 0.3);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 10, 5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+    // Main room light - dim and moody
+    const roomLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    roomLight.position.set(3, 8, 4);
+    roomLight.castShadow = true;
+    roomLight.shadow.mapSize.width = 2048;
+    roomLight.shadow.mapSize.height = 2048;
+    scene.add(roomLight);
     
-    // Create a simple room
-    const roomGeometry = new THREE.BoxGeometry(10, 4, 10);
+    // Warm accent light from the corner
+    const accentLight = new THREE.PointLight(0xffaa77, 0.4, 10);
+    accentLight.position.set(-3, 2, -3);
+    scene.add(accentLight);
+    
+    // Create room structure
+    createRoomStructure(scene);
+    
+    // Create and place furniture
+    const desk = objectFactory.createDesk('desk', 2, 0, -3);
+    scene.add(desk.mesh);
+    interactionSystem.registerObject(desk);
+    
+    const bed = objectFactory.createBed('bed', -3, 0, 2);
+    scene.add(bed.mesh);
+    interactionSystem.registerObject(bed);
+    
+    const chair = objectFactory.createChair('chair', 1.5, 0, -2.5);
+    scene.add(chair.mesh);
+    interactionSystem.registerObject(chair);
+    
+    // Create and place interactive technology objects
+    const laptop = objectFactory.createLaptop('laptop', 2, 0.8, -3);
+    scene.add(laptop.mesh);
+    interactionSystem.registerObject(laptop);
+    
+    const phone = objectFactory.createPhone('phone', 1.5, 0.8, -3.2);
+    scene.add(phone.mesh);
+    interactionSystem.registerObject(phone);
+    
+    const vrHeadset = objectFactory.createVRHeadset('vr_headset', -2, 0.6, 2);
+    scene.add(vrHeadset.mesh);
+    interactionSystem.registerObject(vrHeadset);
+    
+    const alarmClock = objectFactory.createAlarmClock('alarm_clock', -2.5, 0.6, 1.5);
+    scene.add(alarmClock.mesh);
+    interactionSystem.registerObject(alarmClock);
+    
+    // Connect objects to story system
+    setupStoryIntegration(storySystem, interactionSystem);
+}
+
+function createRoomStructure(scene: THREE.Scene): void {
+    // Room walls - using BackSide to render interior
+    const roomGeometry = new THREE.BoxGeometry(8, 4, 8);
     const roomMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x444444,
+        color: 0x3a3a3a,
         side: THREE.BackSide
     });
     const room = new THREE.Mesh(roomGeometry, roomMaterial);
     room.position.set(0, 2, 0);
+    room.receiveShadow = true;
     scene.add(room);
     
-    // Add a floor
-    const floorGeometry = new THREE.PlaneGeometry(10, 10);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    // Floor
+    const floorGeometry = new THREE.PlaneGeometry(8, 8);
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x2a2a2a,
+        roughness: 0.8,
+        metalness: 0.1
+    });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
     
-    // Create test objects
-    createTestCube(scene, interactionSystem, storySystem, { x: 2, y: 1, z: 0 }, 'red_cube');
-    createTestCube(scene, interactionSystem, storySystem, { x: -2, y: 1, z: 0 }, 'blue_cube');
-    createTestCube(scene, interactionSystem, storySystem, { x: 0, y: 1, z: -2 }, 'green_cube');
+    // Ceiling
+    const ceilingGeometry = new THREE.PlaneGeometry(8, 8);
+    const ceilingMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x404040,
+        roughness: 0.9
+    });
+    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.y = 4;
+    scene.add(ceiling);
 }
 
-function createTestCube(
-    scene: THREE.Scene, 
-    interactionSystem: InteractionSystem, 
-    storySystem: StorySystem,
-    position: { x: number, y: number, z: number },
-    id: string
-): void {
-    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    const colors = {
-        red_cube: 0xff0000,
-        blue_cube: 0x0000ff,
-        green_cube: 0x00ff00
-    };
+function setupCollisions(game: Game, interactionSystem: InteractionSystem): void {
+    const cameraController = game.getCameraController();
+    const registeredObjects = interactionSystem.getRegisteredObjects();
     
-    const material = new THREE.MeshStandardMaterial({ 
-        color: colors[id as keyof typeof colors] || 0xffffff 
+    // Add all interactive objects as collision objects
+    registeredObjects.forEach(obj => {
+        cameraController.addCollisionObject(obj.mesh);
     });
     
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(position.x, position.y, position.z);
-    mesh.userData.interactableId = id;
-    mesh.castShadow = true;
-    scene.add(mesh);
+    console.log(`Collision detection enabled for ${registeredObjects.length} objects`);
+}
+
+function setupProximityFeedback(interactionSystem: InteractionSystem): void {
+    // Set up proximity event handlers
+    interactionSystem.onProximityEnter((object) => {
+        console.log(`Near interactive object: ${object.name}`);
+    });
     
-    // Create interactable object
-    const interactableObject = {
-        id,
-        mesh,
-        name: id.replace('_', ' ').toUpperCase(),
-        description: `A ${id.replace('_cube', '')} cube for testing interactions`,
-        examined: false,
-        onExamine: () => {
-            console.log(`Examined ${id}`);
-            storySystem.setFlag(`${id}_examined`, true);
-            storySystem.discoverObject(id);
-        },
-        highlightOnHover: true
-    };
+    interactionSystem.onProximityExit((object) => {
+        console.log(`Left interactive object: ${object.name}`);
+    });
     
-    interactionSystem.registerObject(interactableObject);
+    console.log('Proximity detection system initialized');
+}
+
+function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem): void {
+    // Listen for object interactions and update story flags
+    interactionSystem.onClick((object) => {
+        console.log(`Interacted with: ${object.name}`);
+        storySystem.setFlag(`${object.id}_interacted`, true);
+        storySystem.discoverObject(object.id);
+        
+        // Check for story progression
+        if (object.id === 'laptop') {
+            storySystem.setFlag('laptop_accessed', true);
+        } else if (object.id === 'vr_headset') {
+            storySystem.setFlag('vr_examined', true);
+        } else if (object.id === 'phone') {
+            storySystem.setFlag('phone_examined', true);
+        }
+    });
+    
+    // Listen for story events
+    storySystem.on('actChanged', (data) => {
+        console.log(`Act changed: ${data.previousAct} -> ${data.currentAct}`);
+    });
+    
+    storySystem.on('objectDiscovered', (data) => {
+        console.log(`Object discovered: ${data.objectId} (${data.totalDiscovered} total)`);
+    });
 }
 
 function updateDebugInfo(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem): void {
@@ -157,7 +267,9 @@ function updateDebugInfo(game: Game, storySystem: StorySystem, interactionSystem
         
         if (objectsElement) {
             const discovered = storySystem.getDiscoveredObjects().size;
-            objectsElement.textContent = `Objects: ${discovered}/3`;
+            const currentAct = storySystem.getCurrentAct();
+            const nearbyCount = interactionSystem.getNearbyObjects().length;
+            objectsElement.textContent = `Act ${currentAct} | Objects: ${discovered}/7 | Nearby: ${nearbyCount}`;
         }
         
         requestAnimationFrame(update);

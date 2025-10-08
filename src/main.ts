@@ -2,6 +2,8 @@ import { Game } from '@core/Game';
 import { StorySystem } from '@systems/StorySystem';
 import { InteractionSystem } from '@systems/InteractionSystem';
 import { SimpleDialogueContent } from '@/content/SimpleDialogueContent';
+import { DialogueModal } from '@/systems/DialogueModal';
+import { AudioSystem } from '@/systems/AudioSystem';
 import { ObjectFactory } from '@core/ObjectFactory';
 import * as THREE from 'three';
 
@@ -18,10 +20,15 @@ async function initGame(): Promise<void> {
     // Initialize systems
     const storySystem = new StorySystem();
     const interactionSystem = new InteractionSystem();
+    const dialogueModal = new DialogueModal(game);
+    const audioSystem = new AudioSystem();
     const objectFactory = new ObjectFactory();
     
     // Set interaction system reference in game
     game.setInteractionSystem(interactionSystem);
+    
+    // Initialize audio system
+    await initializeAudioSystem(audioSystem);
     
     // Create the main room scene
     createMainRoomScene(game, storySystem, interactionSystem, objectFactory);
@@ -34,6 +41,12 @@ async function initGame(): Promise<void> {
     
     // Connect E key to interaction system
     setupInteractionControls(game, interactionSystem);
+    
+    // Connect objects to story system and dialogue modal
+    setupStoryIntegration(storySystem, interactionSystem, dialogueModal);
+    
+    // Set up audio integration
+    setupAudioIntegration(interactionSystem, audioSystem);
     
     // Start the game
     game.start();
@@ -95,8 +108,7 @@ function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSy
     scene.add(alarmClock.mesh);
     interactionSystem.registerObject(alarmClock);
     
-    // Connect objects to story system and simple dialogue
-    setupStoryIntegration(storySystem, interactionSystem);
+    // This line is now handled above with dialogueModal parameter
 }
 
 function createRoomStructure(scene: THREE.Scene): void {
@@ -153,9 +165,12 @@ function setupInteractionControls(game: Game, interactionSystem: InteractionSyst
     // Handle E key press for interaction
     document.addEventListener('keydown', (event) => {
         if (event.key.toLowerCase() === 'e') {
-            const success = interactionSystem.triggerInteraction();
-            if (success) {
-                console.log('Interaction triggered with E key');
+            // Don't trigger interactions if game is paused (dialogue active)
+            if (!game.isPaused()) {
+                const success = interactionSystem.triggerInteraction();
+                if (success) {
+                    console.log('Interaction triggered with E key');
+                }
             }
         }
     });
@@ -194,7 +209,7 @@ function setupProximityFeedback(interactionSystem: InteractionSystem): void {
     console.log('Focus-based interaction system initialized');
 }
 
-function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem): void {
+function setupStoryIntegration(storySystem: StorySystem, interactionSystem: InteractionSystem, dialogueModal: DialogueModal): void {
     // Listen for object interactions and show simple descriptions
     interactionSystem.onInteraction((object) => {
         console.log(`Interacted with: ${object.name}`);
@@ -203,8 +218,8 @@ function setupStoryIntegration(storySystem: StorySystem, interactionSystem: Inte
         const description = SimpleDialogueContent.getObjectDescription(object.id);
         
         if (description) {
-            // Display the simple description
-            showSimpleDescription(object.name, description);
+            // Display the simple description using DialogueModal
+            dialogueModal.show(object.name, description);
             
             // Update story flags
             storySystem.setFlag(`${object.id}_interacted`, true);
@@ -220,7 +235,7 @@ function setupStoryIntegration(storySystem: StorySystem, interactionSystem: Inte
             }
         } else {
             // Fallback to generic message if no description exists
-            showSimpleDescription(object.name, `You examine the ${object.name.toLowerCase()}.`);
+            dialogueModal.show(object.name, `You examine the ${object.name.toLowerCase()}.`);
         }
     });
     
@@ -234,60 +249,7 @@ function setupStoryIntegration(storySystem: StorySystem, interactionSystem: Inte
     });
 }
 
-function showSimpleDescription(objectName: string, description: string): void {
-    // Find or create dialogue container
-    let dialogueContainer = document.getElementById('dialogue-container');
-    if (!dialogueContainer) {
-        dialogueContainer = document.createElement('div');
-        dialogueContainer.id = 'dialogue-container';
-        dialogueContainer.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            max-width: 600px;
-            margin: 0 auto;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00ff88;
-            padding: 20px;
-            border: 2px solid #00ff88;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.4;
-            z-index: 1000;
-            display: none;
-        `;
-        document.body.appendChild(dialogueContainer);
-    }
-    
-    // Set the description text
-    dialogueContainer.innerHTML = `
-        <div style="margin-bottom: 10px; color: #fff; font-weight: bold;">${objectName}</div>
-        <div>${description}</div>
-        <div style="margin-top: 15px; color: #888; font-size: 12px;">Press SPACE to close</div>
-    `;
-    
-    // Show the dialogue
-    dialogueContainer.style.display = 'block';
-    
-    // Add SPACE key handler to close dialogue
-    const handleSpace = (event: KeyboardEvent) => {
-        if (event.key === ' ' || event.code === 'Space') {
-            dialogueContainer!.style.display = 'none';
-            document.removeEventListener('keydown', handleSpace);
-        }
-    };
-    document.addEventListener('keydown', handleSpace);
-    
-    // Auto-hide after 10 seconds
-    setTimeout(() => {
-        if (dialogueContainer && dialogueContainer.style.display !== 'none') {
-            dialogueContainer.style.display = 'none';
-            document.removeEventListener('keydown', handleSpace);
-        }
-    }, 10000);
-}
+// Inline modal code removed - now using isolated DialogueModal class
 
 function updateDebugInfo(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem): void {
     let lastTime = 0;
@@ -331,6 +293,51 @@ function updateDebugInfo(game: Game, storySystem: StorySystem, interactionSystem
     }
     
     update();
+}
+
+async function initializeAudioSystem(audioSystem: AudioSystem): Promise<void> {
+    try {
+        // Preload sound effects
+        const soundAssets = {
+            'interact': '/sounds/interact.mp3',
+            'click': '/sounds/click.mp3',
+            'hover': '/sounds/hover.mp3',
+            'ambient': '/sounds/ambient-room.mp3'
+        };
+        
+        console.log('Loading audio assets...');
+        await audioSystem.preloadSounds(soundAssets);
+        console.log('Audio system initialized successfully');
+        
+        // Start ambient music
+        audioSystem.playMusic('/sounds/ambient-room.mp3', true);
+        audioSystem.setMusicVolume(0.3); // Lower volume for ambient
+        
+    } catch (error) {
+        console.warn('Audio system initialization failed, continuing without sound:', error);
+    }
+}
+
+function setupAudioIntegration(interactionSystem: InteractionSystem, audioSystem: AudioSystem): void {
+    // Handle user interaction for audio context
+    document.addEventListener('click', async () => {
+        await audioSystem.resumeAudioContext();
+    }, { once: true });
+    
+    // Play sound effects on interactions
+    interactionSystem.onInteraction((object) => {
+        console.log(`Playing interaction sound for: ${object.name}`);
+        audioSystem.playSFX('interact', 0.7);
+    });
+    
+    // Play hover sounds on focus change
+    interactionSystem.onFocusChange((object, previous) => {
+        if (object) {
+            audioSystem.playSFX('hover', 0.4);
+        }
+    });
+    
+    console.log('Audio integration initialized');
 }
 
 // Initialize game when DOM is loaded

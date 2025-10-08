@@ -12,6 +12,7 @@ export class Game {
   public interactionSystem: InteractionSystem | null = null;
   
   private running: boolean = false;
+  private paused: boolean = false;
   private lastTime: number = 0;
   private animationId: number = 0;
 
@@ -64,6 +65,20 @@ export class Game {
     return this.running;
   }
 
+  pause(): void {
+    this.paused = true;
+    this.cameraController.setEnabled(false);
+  }
+
+  unpause(): void {
+    this.paused = false;
+    this.cameraController.setEnabled(true);
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
   private gameLoop(currentTime: number): void {
     if (!this.running) return;
 
@@ -77,6 +92,9 @@ export class Game {
   }
 
   private update(deltaTime: number): void {
+    // Don't update game systems if paused
+    if (this.paused) return;
+    
     // Update camera controller
     this.cameraController.update(deltaTime);
     

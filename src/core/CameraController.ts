@@ -18,6 +18,7 @@ export class CameraController {
   private maxPitch: number = Math.PI / 2 - 0.1;
   
   private isPointerLocked: boolean = false;
+  private enabled: boolean = true;
   private previousMouseX: number = 0;
   private previousMouseY: number = 0;
   
@@ -66,7 +67,7 @@ export class CameraController {
 
   private setupMouseMovement(): void {
     document.addEventListener('mousemove', (event) => {
-      if (!this.isPointerLocked) return;
+      if (!this.isPointerLocked || !this.enabled) return;
 
       const movementX = event.movementX || 0;
       const movementY = event.movementY || 0;
@@ -96,6 +97,9 @@ export class CameraController {
   }
 
   update(deltaTime: number): void {
+    // Don't update if camera controls are disabled
+    if (!this.enabled) return;
+    
     const deltaSeconds = deltaTime / 1000;
     
     // Reset velocity
@@ -186,6 +190,11 @@ export class CameraController {
   // Method to set collision objects from the scene
   setCollisionObjects(objects: THREE.Object3D[]): void {
     this.collisionObjects = [...objects];
+  }
+
+  // Enable/disable camera controls (for pausing)
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
   }
 
   dispose(): void {

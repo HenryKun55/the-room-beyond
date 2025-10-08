@@ -19,35 +19,111 @@
 - **ESLint**: Code quality
 - **Prettier**: Code formatting
 
-## Architecture
+## Architecture (Updated October 2025)
+
+### ✅ **Current Architecture - Modular System Design**
+
+Our architecture follows **Single Responsibility Principle** with isolated, testable systems:
+
+```
+src/
+├── core/                       # Core engine components
+│   ├── Game.ts                 # Main game loop & rendering
+│   ├── InputHandler.ts         # Input management
+│   ├── CameraController.ts     # FPS camera + collision detection
+│   ├── ObjectFactory.ts        # Procedural 3D object creation
+│   └── RoomFactory.ts          # Room structure generation
+├── systems/                    # Game logic systems  
+│   ├── StorySystem.ts          # Narrative & progression
+│   ├── InteractionSystem.ts    # Object interaction
+│   ├── DialogueModal.ts        # UI dialogue display
+│   ├── AudioSystem.ts          # Sound management
+│   └── LightingSystem.ts       # Scene lighting
+├── content/                    # Game content
+│   └── SimpleDialogueContent.ts # Object descriptions
+└── main.ts                     # System orchestration (150 lines)
+```
 
 ### Design Patterns
 
-#### 1. Entity-Component System (ECS)
+#### 1. **Factory Pattern** (Object Creation)
 ```typescript
-interface Entity {
-  id: string;
-  components: Map<string, Component>;
-}
-
-interface Component {
-  type: string;
-  update?(deltaTime: number): void;
-}
-```
-
-#### 2. Observer Pattern (Events)
-```typescript
-interface EventEmitter {
-  on(event: string, callback: Function): void;
-  off(event: string, callback: Function): void;
-  emit(event: string, data?: any): void;
+export class ObjectFactory {
+  createDesk(id: string, x: number, y: number, z: number): InteractiveObject {
+    const geometry = new THREE.BoxGeometry(1.5, 0.8, 0.8);
+    const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    return {
+      id, name: 'Desk', mesh,
+      interactionRadius: 2.0,
+      onInteract: () => console.log('Examining desk...')
+    };
+  }
 }
 ```
 
-#### 3. State Machine (Game States)
+#### 2. **Observer Pattern** (Event System)
 ```typescript
-enum GameState {
+export class StorySystem {
+  private eventListeners: Map<StoryEventType, EventCallback[]> = new Map();
+  
+  on(event: StoryEventType, callback: EventCallback): void {
+    const listeners = this.eventListeners.get(event) || [];
+    listeners.push(callback);
+    this.eventListeners.set(event, listeners);
+  }
+  
+  private emit(event: StoryEventType, data: any): void {
+    const listeners = this.eventListeners.get(event) || [];
+    listeners.forEach(callback => callback(data));
+  }
+}
+```
+
+#### 3. **Strategy Pattern** (Collision Detection)
+```typescript
+export class CameraController {
+  private checkObjectCollision(position: THREE.Vector3, object: THREE.Object3D): boolean {
+    const box = new THREE.Box3().setFromObject(object);
+    const expandedBox = box.clone().expandByScalar(this.playerRadius);
+    return expandedBox.containsPoint(position);
+  }
+}
+```
+
+#### 4. **Dependency Injection** (System Integration)
+```typescript
+async function initGame(): Promise<void> {
+  // Create isolated systems
+  const game = new Game(canvas);
+  const roomFactory = new RoomFactory();
+  const lightingSystem = new LightingSystem();
+  const interactionSystem = new InteractionSystem();
+  
+  // Inject dependencies
+  game.setInteractionSystem(interactionSystem);
+  
+  // Compose systems
+  createMainRoomScene(game, roomFactory, lightingSystem, objectFactory, interactionSystem);
+}
+```
+
+### Game States (Simplified)
+```typescript
+export class Game {
+  private paused: boolean = false;
+  
+  pause(): void {
+    this.paused = true;
+    this.cameraController.setEnabled(false);
+  }
+  
+  unpause(): void {
+    this.paused = false;
+    this.cameraController.setEnabled(true);
+  }
+}
   LOADING,
   MAIN_MENU,
   PLAYING,

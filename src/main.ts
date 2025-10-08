@@ -5,7 +5,8 @@ import { SimpleDialogueContent } from '@/content/SimpleDialogueContent';
 import { DialogueModal } from '@/systems/DialogueModal';
 import { AudioSystem } from '@/systems/AudioSystem';
 import { ObjectFactory } from '@core/ObjectFactory';
-import * as THREE from 'three';
+import { RoomFactory } from '@core/RoomFactory';
+import { LightingSystem } from '@systems/LightingSystem';
 
 // Main entry point for the game
 async function initGame(): Promise<void> {
@@ -17,23 +18,75 @@ async function initGame(): Promise<void> {
     // Create game instance
     const game = new Game(canvas);
     
-    // Initialize systems
+    // Initialize all systems
     const storySystem = new StorySystem();
     const interactionSystem = new InteractionSystem();
     const dialogueModal = new DialogueModal(game);
     const audioSystem = new AudioSystem();
     const objectFactory = new ObjectFactory();
+    const roomFactory = new RoomFactory();
+    const lightingSystem = new LightingSystem();
     
     // Set interaction system reference in game
     game.setInteractionSystem(interactionSystem);
     
-    // Initialize audio system
+    // Initialize systems
     await initializeAudioSystem(audioSystem);
+    createMainRoomScene(game, roomFactory, lightingSystem, objectFactory, interactionSystem);
+    setupSystemIntegrations(game, storySystem, interactionSystem, dialogueModal, audioSystem);
     
-    // Create the main room scene
-    createMainRoomScene(game, storySystem, interactionSystem, objectFactory);
+    // Start the game
+    game.start();
     
-    // Set up collision objects for camera controller
+    // Start debug info updates
+    updateDebugInfo(game, storySystem, interactionSystem);
+}
+
+function createMainRoomScene(
+    game: Game, 
+    roomFactory: RoomFactory, 
+    lightingSystem: LightingSystem, 
+    objectFactory: ObjectFactory, 
+    interactionSystem: InteractionSystem
+): void {
+    const scene = game.getScene();
+    
+    // Add room structure using RoomFactory
+    roomFactory.addToScene(scene);
+    
+    // Add lighting using LightingSystem
+    lightingSystem.addToScene(scene);
+    
+    // Create and add interactive objects
+    const objects = [
+        { factory: () => objectFactory.createDesk('desk', 1.8, 0.01, -3.7), rotation: 0 },
+        { factory: () => objectFactory.createChair('chair', 1.3, 0.01, -2.8), rotation: Math.PI },
+        { factory: () => objectFactory.createBed('bed', -3.2, 0.01, 3.0), rotation: 0 },
+        { factory: () => objectFactory.createLaptop('laptop', 1.8, 0.82, -3.7), rotation: 0 },
+        { factory: () => objectFactory.createPhone('phone', 1.2, 0.82, -3.6), rotation: 0 },
+        { factory: () => objectFactory.createVRHeadset('vr_headset', -2.8, 0.62, 2.8), rotation: 0 },
+        { factory: () => objectFactory.createAlarmClock('alarm_clock', -3.5, 0.62, 2.2), rotation: 0 }
+    ];
+    
+    objects.forEach(({ factory, rotation }) => {
+        const obj = factory();
+        obj.mesh.userData.id = obj.id;
+        if (rotation !== 0) {
+            obj.mesh.rotation.y = rotation;
+        }
+        scene.add(obj.mesh);
+        interactionSystem.registerObject(obj);
+    });
+}
+
+function setupSystemIntegrations(
+    game: Game,
+    storySystem: StorySystem, 
+    interactionSystem: InteractionSystem, 
+    dialogueModal: DialogueModal, 
+    audioSystem: AudioSystem
+): void {
+    // Set up collision detection
     setupCollisions(game, interactionSystem);
     
     // Set up proximity feedback
@@ -47,111 +100,12 @@ async function initGame(): Promise<void> {
     
     // Set up audio integration
     setupAudioIntegration(interactionSystem, audioSystem);
-    
-    // Start the game
-    game.start();
-    
-    // Debug info updates
-    updateDebugInfo(game, storySystem, interactionSystem);
-}
-
-function createMainRoomScene(game: Game, storySystem: StorySystem, interactionSystem: InteractionSystem, objectFactory: ObjectFactory): void {
-    const scene = game.getScene();
-    
-    // Add atmospheric lighting
-    const ambientLight = new THREE.AmbientLight(0x2a2a3a, 0.3);
-    scene.add(ambientLight);
-    
-    // Main room light - dim and moody
-    const roomLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    roomLight.position.set(3, 8, 4);
-    roomLight.castShadow = true;
-    roomLight.shadow.mapSize.width = 2048;
-    roomLight.shadow.mapSize.height = 2048;
-    scene.add(roomLight);
-    
-    // Warm accent light from the corner
-    const accentLight = new THREE.PointLight(0xffaa77, 0.4, 10);
-    accentLight.position.set(-3, 2, -3);
-    scene.add(accentLight);
-    
-    // Create room structure
-    createRoomStructure(scene);
-    
-    // Create and place furniture
-    const desk = objectFactory.createDesk('desk', 2, 0, -3);
-    scene.add(desk.mesh);
-    interactionSystem.registerObject(desk);
-    
-    const bed = objectFactory.createBed('bed', -3, 0, 2);
-    scene.add(bed.mesh);
-    interactionSystem.registerObject(bed);
-    
-    const chair = objectFactory.createChair('chair', 1.5, 0, -2.5);
-    scene.add(chair.mesh);
-    interactionSystem.registerObject(chair);
-    
-    // Create and place interactive technology objects
-    const laptop = objectFactory.createLaptop('laptop', 2, 0.8, -3);
-    scene.add(laptop.mesh);
-    interactionSystem.registerObject(laptop);
-    
-    const phone = objectFactory.createPhone('phone', 1.5, 0.8, -3.2);
-    scene.add(phone.mesh);
-    interactionSystem.registerObject(phone);
-    
-    const vrHeadset = objectFactory.createVRHeadset('vr_headset', -2, 0.6, 2);
-    scene.add(vrHeadset.mesh);
-    interactionSystem.registerObject(vrHeadset);
-    
-    const alarmClock = objectFactory.createAlarmClock('alarm_clock', -2.5, 0.6, 1.5);
-    scene.add(alarmClock.mesh);
-    interactionSystem.registerObject(alarmClock);
-    
-    // This line is now handled above with dialogueModal parameter
-}
-
-function createRoomStructure(scene: THREE.Scene): void {
-    // Room walls - using BackSide to render interior
-    const roomGeometry = new THREE.BoxGeometry(8, 4, 8);
-    const roomMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x3a3a3a,
-        side: THREE.BackSide
-    });
-    const room = new THREE.Mesh(roomGeometry, roomMaterial);
-    room.position.set(0, 2, 0);
-    room.receiveShadow = true;
-    scene.add(room);
-    
-    // Floor
-    const floorGeometry = new THREE.PlaneGeometry(8, 8);
-    const floorMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x2a2a2a,
-        roughness: 0.8,
-        metalness: 0.1
-    });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-    
-    // Ceiling
-    const ceilingGeometry = new THREE.PlaneGeometry(8, 8);
-    const ceilingMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x404040,
-        roughness: 0.9
-    });
-    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.y = 4;
-    scene.add(ceiling);
 }
 
 function setupCollisions(game: Game, interactionSystem: InteractionSystem): void {
     const cameraController = game.getCameraController();
     const registeredObjects = interactionSystem.getRegisteredObjects();
     
-    // Add all interactive objects as collision objects
     registeredObjects.forEach(obj => {
         cameraController.addCollisionObject(obj.mesh);
     });

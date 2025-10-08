@@ -24,7 +24,7 @@ export class CameraController {
   
   // Collision detection
   private collisionObjects: THREE.Object3D[] = [];
-  private playerRadius: number = 0.3;
+  private playerRadius: number = 0.5; // Increased collision radius
   private roomBounds = { x: 3.8, z: 3.8 }; // Room is 8x8, so bounds are ±3.8
 
   constructor(camera: THREE.PerspectiveCamera, inputHandler: InputHandler, canvas: HTMLCanvasElement) {
@@ -157,18 +157,21 @@ export class CameraController {
   // Collision Detection Methods
   addCollisionObject(object: THREE.Object3D): void {
     this.collisionObjects.push(object);
+    console.log('Added collision object:', object.userData?.id || 'unknown', 'Total objects:', this.collisionObjects.length);
   }
 
   private checkCollision(position: THREE.Vector3): boolean {
     // Check room bounds (walls)
     if (Math.abs(position.x) > this.roomBounds.x || 
         Math.abs(position.z) > this.roomBounds.z) {
+      console.log('Wall collision detected at:', position);
       return true; // Collision with walls
     }
 
     // Check collision with objects
     for (const obj of this.collisionObjects) {
       if (this.checkObjectCollision(position, obj)) {
+        console.log('Object collision detected with:', obj.userData?.id || 'unknown', 'at position:', position);
         return true;
       }
     }
@@ -177,14 +180,20 @@ export class CameraController {
   }
 
   private checkObjectCollision(position: THREE.Vector3, object: THREE.Object3D): boolean {
-    // Get object's bounding box
+    // Get object's bounding box - ensure it's computed properly
     const box = new THREE.Box3().setFromObject(object);
     
-    // Expand the box by player radius for collision
-    box.expandByScalar(this.playerRadius);
+    // Simple approach: expand the bounding box by player radius and check if position is inside
+    const expandedBox = box.clone().expandByScalar(this.playerRadius);
+    const collision = expandedBox.containsPoint(position);
     
-    // Check if player position is inside the expanded box
-    return box.containsPoint(position);
+    // Debug logging
+    const distance = box.distanceToPoint(position);
+    if (distance < 2.0) {
+      console.log(`Object ${object.userData?.id || 'unknown'}: distance=${distance.toFixed(2)}, collision=${collision}, box:`, box.min, box.max);
+    }
+    
+    return collision;
   }
 
   // Method to set collision objects from the scene
